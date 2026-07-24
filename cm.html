@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Climb Monkey Control Panel</title>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: Arial, sans-serif; background: #0f172a; color: white; text-align: center; margin: 15px; }
+        .hidden { display: none !important; }
+        .box-panel { background: #1e293b; padding: 20px; border-radius: 10px; max-width: 1200px; margin: auto; }
+
+        button, input {
+            padding: 9px; margin: 5px; border-radius: 6px; background: #334155; color: white;
+            border: 1px solid #475569; font-size: 15px; cursor: pointer; font-weight: bold;
+            position: relative; overflow: hidden;
+            transition: transform .12s ease, box-shadow .12s ease, background .15s ease, filter .15s ease;
+        }
+        button:hover { filter: brightness(1.18); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+        button:active { transform: translateY(0) scale(.94); filter: brightness(.92); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+        button.pressed { animation: btnPop .28s ease; }
+        @keyframes btnPop {
+            0% { transform: scale(1); }
+            35% { transform: scale(.9); }
+            65% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Ripple effect element injected by JS */
+        .ripple {
+            position: absolute; border-radius: 50%; background: rgba(255,255,255,.55);
+            transform: scale(0); animation: rippleAnim .55s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes rippleAnim {
+            to { transform: scale(2.6); opacity: 0; }
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; margin-top: 15px; }
+        .card {
+            background: linear-gradient(155deg, #1e293b, #17202f);
+            border: 2px solid #334155; border-radius: 10px; cursor: pointer; padding: 10px; text-align: left;
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+        .card:hover {
+            border-color: #00e08f;
+            transform: translateY(-4px) scale(1.015);
+            box-shadow: 0 10px 26px -8px rgba(0,224,143,.35), 0 0 0 1px rgba(0,224,143,.25) inset;
+        }
+        .card:active { transform: translateY(-1px) scale(.98); }
+        .preview { background: #020617; height: 65px; border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+        .preview svg path { filter: drop-shadow(0 0 5px currentColor); }
+
+        .wall-container { background: #020617; padding: 15px; border-radius: 6px; max-height: 75vh; overflow: auto; text-align: left; }
+        .wall { display: grid; gap: 8px; width: max-content; min-width: 100%; }
+        .box {
+            background: #111827; padding: 4px; min-height: 65px; width: 45px; font-size: 10px; cursor: move;
+            border: 1px solid #1e293b; border-radius: 6px; position: relative; text-align: center; box-sizing: border-box;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        .box:hover { border-color: #334155; }
+        .rock {
+            width: 35px; height: 35px; transform: rotate(-90deg); display: block; margin: 4px auto;
+            transition: filter .2s ease;
+        }
+        .seg {
+            fill: #2a3547; stroke: #020617; stroke-width: 2;
+            transition: fill .18s ease, filter .18s ease;
+        }
+        .seg.clickable { cursor: pointer; }
+        .seg.clickable:hover { filter: brightness(1.4); }
+
+        /* Bright, glowing lit segments — the "super brightness" look */
+        .r.on { fill: #ff2d2d; filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 14px rgba(255,45,45,.85)); }
+        .g.on { fill: #2dff7a; filter: drop-shadow(0 0 6px #2dff7a) drop-shadow(0 0 14px rgba(45,255,122,.85)); }
+        .b.on { fill: #2d8bff; filter: drop-shadow(0 0 6px #2d8bff) drop-shadow(0 0 14px rgba(45,139,255,.85)); }
+        .seg.on { animation: segPulse 1.6s ease-in-out infinite; }
+        @keyframes segPulse {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 6px currentColor); }
+            50% { filter: brightness(1.35) drop-shadow(0 0 16px currentColor); }
+        }
+
+        .empty { margin-top: 20px; color: #475569; font-weight: bold; font-size: 14px; }
+        .action-btns { position: absolute; top: 1px; left: 0; right: 0; display: flex; justify-content: center; gap: 2px; z-index: 10; }
+        .action-btns span {
+            font-size: 8px; padding: 1px 2px; background: #1e293b; border-radius: 2px; cursor: pointer;
+            color: #38bdf8; font-weight: bold; transition: background .15s ease, transform .12s ease;
+        }
+        .action-btns span:hover { background: #0284c7; color: white; }
+        .action-btns span:active { transform: scale(.85); }
+        .status-msg { display: inline-block; margin-left: 10px; font-size: 13px; color: #4ade80; min-width: 160px; text-align: left; }
+
+        /* Smooth appearance for screens */
+        #p2:not(.hidden), #p3:not(.hidden) { animation: fadeSlide .25s ease; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="position:fixed; top:5px; right:8px; font-size:11px; color:#4ade80; background:#020617; padding:3px 8px; border-radius:4px; z-index:999;">v6b — with Copy as Code</div>
+
+    <!-- ===================== LOGIN ===================== -->
+    <div id="p1" class="box-panel" style="max-width: 310px; margin-top: 15vh;">
+        <h2>CLIMB <span style="color:#00a86b;">MONKEY</span></h2>
+        <input type="text" id="user" placeholder="User ID" style="width: 85%;"><br>
+        <input type="password" id="pass" placeholder="Password" style="width: 85%;"><br>
+        <button style="background:#00a86b; font-weight:bold; border:none; width:92%;" onclick="login()">Sign In</button>
+        <p id="err" style="color: #ef4444; font-size: 13px; font-weight: bold; margin-top:10px;"></p>
+    </div>
+
+    <!-- ===================== CATALOG ===================== -->
+    <div id="p2" class="box-panel hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="tag" style="margin: 0; color:#00a86b;">CLIMB MONKEY</h2>
+            <button onclick="logout()" style="background:#ef4444; border:none;">Logout</button>
+        </div>
+        <div id="levelAdminBar" class="hidden" style="margin-top:10px;">
+            <button style="background:#16a34a;" onclick="addLevelPrompt()">➕ Add Level</button>
+            <span style="color:#94a3b8; font-size:12px; margin-left:6px;">Click a level's ✕ to remove it</span>
+        </div>
+        <div class="grid" id="lvls"></div>
+    </div>
+
+    <!-- ===================== LEVEL ===================== -->
+    <div id="p3" class="box-panel hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap: wrap;">
+            <button onclick="show('p2','p3')" style="background:#475569;">⬅ Catalog</button>
+            <h3 id="title" style="color:#00a86b; margin:0;">Level</h3>
+        </div>
+
+        <h2>CLIMB MONKEY</h2>
+
+        <div style="margin-bottom: 10px;">
+            <button onclick="startBlink()" style="background:#10b981; border:none; font-weight:bold;">▶ START</button>
+            <button onclick="stopBlink()" style="background:#ef4444; border:none; font-weight:bold;">⏹ STOP</button>
+            <button style="background:#f97316;" onclick="allOff()">↺ Reset</button>
+        </div>
+
+        <div id="adminTools" class="hidden" style="margin-bottom: 10px;">
+            <button style="background:#3b82f6;" id="undoBtn" onclick="undo()">↩ Undo</button>
+            <button style="background:#3b82f6;" id="redoBtn" onclick="redo()">↪ Redo</button>
+            <button style="background:#16a34a;" onclick="saveToStorage()">💾 Save Layout</button>
+            <button style="background:#7c3aed;" onclick="showCodeExport()">📋 Copy as Code</button>
+            <button style="background:#f97316;" onclick="resetToDefault()">↺ Reset Layout</button>
+            <span class="status-msg" id="statusMsg"></span>
+        </div>
+
+        <div class="wall-container">
+            <div class="wall" id="matrix"></div>
+        </div>
+    </div>
+
+    <!-- ===================== GENERIC CONFIRM MODAL ===================== -->
+    <div id="genericConfirmModal" class="hidden" style="position:fixed; inset:0; background:rgba(8,10,12,.8); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:380px; width:100%; padding:20px;">
+            <b style="color:#f97316; display:block; margin-bottom:12px;">Please confirm</b>
+            <p id="genericConfirmText" style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;"></p>
+            <div style="display:flex; gap:8px;">
+                <button style="background:#f97316; flex:1;" onclick="runGenericConfirm()">Yes, continue</button>
+                <button style="background:#475569; flex:1;" onclick="closeGenericConfirm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== ADD LEVEL MODAL ===================== -->
+    <div id="addLevelModal" class="hidden" style="position:fixed; inset:0; background:rgba(8,10,12,.8); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:380px; width:100%; padding:20px;">
+            <b style="color:#00a86b; display:block; margin-bottom:12px;">Add new level</b>
+            <input type="text" id="newLevelName" placeholder="Level name (e.g. Overhang Beast)" style="width:100%; margin:0 0 14px 0;">
+            <div style="display:flex; gap:8px;">
+                <button style="background:#16a34a; flex:1;" onclick="confirmAddLevel()">Add</button>
+                <button style="background:#475569; flex:1;" onclick="closeAddLevelModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== REMOVE LEVEL MODAL ===================== -->
+    <div id="removeLevelModal" class="hidden" style="position:fixed; inset:0; background:rgba(8,10,12,.8); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:380px; width:100%; padding:20px;">
+            <b style="color:#ef4444; display:block; margin-bottom:12px;">Remove level?</b>
+            <p id="removeLevelText" style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;"></p>
+            <div style="display:flex; gap:8px;">
+                <button style="background:#ef4444; flex:1;" onclick="confirmRemoveLevel()">Remove</button>
+                <button style="background:#475569; flex:1;" onclick="closeRemoveLevelModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== CODE EXPORT MODAL ===================== -->
+    <div id="codeModal" class="hidden" style="position:fixed; inset:0; background:rgba(8,10,12,.8); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:700px; width:100%; padding:20px; max-height:85vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <b style="color:#00a86b;">Paste into DEFAULT_ARR</b>
+                <button onclick="closeCodeExport()" style="background:#475569;">✕ Close</button>
+            </div>
+            <p style="color:#94a3b8; font-size:13px; margin:0 0 10px 0; text-align:left;">
+                Copy this and replace the <code style="color:#4ade80;">const DEFAULT_ARR = [ ... ];</code> block in your HTML file with it.
+            </p>
+            <textarea id="codeOutput" readonly style="flex:1; min-height:250px; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:10px; font-family:monospace; font-size:12px; text-align:left;"></textarea>
+            <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+                <button style="background:#16a34a;" onclick="copyCodeExport()">📋 Copy to clipboard</button>
+                <span class="status-msg" id="copyStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let curUser = "";
+        const show = (s, h) => { document.getElementById(s).classList.remove('hidden'); document.getElementById(h).classList.add('hidden'); }
+
+        // Route line shapes / palette, cycled for however many levels exist
+        const LINE_SHAPES = ["M50,55 L50,5", "M80,55 L20,5", "M20,55 L80,5", "M20,55 L80,35 L20,20 L80,5", "M15,50 L50,10 L85,50", "M50,55 L15,30 L50,5 L85,30 Z", "M50,55 Q20,30 50,25 T50,5", "M20,50 L20,10 L80,10 L80,50", "M30,30 L70,70", "M20,55 L50,35 L80,20 L50,5"];
+        const LINE_COLORS = ["#ef4444", "#22c55e", "#3b82f6", "#ef4444", "#22c55e", "#3b82f6", "#ef4444", "#22c55e", "#3b82f6", "#ef4444"];
+
+        const LEVELS_KEY = "climbMonkeyLevels";
+        const DEFAULT_LEVELS = [
+            "Vertical Line", "Left Diagonal", "Right Leaning", "Zig-Zag Cross", "Pyramid Peak",
+            "Diamond Core", "Snake Curve", "Outer Frame", "Scattered Hold", "Overhang End"
+        ];
+
+        // levels = array of {id, name}. id is stable and used for lighting/title, independent of position.
+        let levels = [];
+        let nextLevelId = 1;
+        let curLevelId = null;
+
+        function loadLevels() {
+            const saved = localStorage.getItem(LEVELS_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    levels = data.levels || [];
+                    nextLevelId = data.nextLevelId || (levels.length + 1);
+                    return;
+                } catch (e) { console.error("Failed to load levels", e); }
+            }
+            // first run: seed with the original 10 levels
+            levels = DEFAULT_LEVELS.map((name, i) => ({ id: i + 1, name }));
+            nextLevelId = levels.length + 1;
+        }
+
+        function saveLevels() {
+            localStorage.setItem(LEVELS_KEY, JSON.stringify({ levels, nextLevelId }));
+        }
+
+        function renderCatalog() {
+            document.getElementById("levelAdminBar").className = (curUser === "inceptarc") ? "" : "hidden";
+            let box = document.getElementById("lvls"); box.innerHTML = "";
+            levels.forEach((lvl, idx) => {
+                const shape = LINE_SHAPES[idx % LINE_SHAPES.length];
+                const color = LINE_COLORS[idx % LINE_COLORS.length];
+                const removeBtn = (curUser === "inceptarc")
+                    ? `<span onclick="event.stopPropagation(); removeLevel(${lvl.id})" style="position:absolute; top:6px; right:8px; color:#ef4444; font-weight:bold; cursor:pointer;">✕</span>`
+                    : "";
+                box.innerHTML += `
+                    <div class="card" style="position:relative;" onclick="openLvl(${lvl.id})">
+                        ${removeBtn}
+                        <div class="preview"><svg style="width:100%; height:100%;"><path d="${shape}" stroke="${color}" stroke-width="2" fill="none"/></svg></div>
+                        <b>Level ${idx + 1}</b><br>
+                        <span style="color:#00a86b; font-size:12px;">${lvl.name}</span>
+                    </div>`;
+            });
+        }
+
+        function addLevelPrompt() {
+            if (curUser !== "inceptarc") return;
+            document.getElementById("newLevelName").value = "";
+            document.getElementById("addLevelModal").classList.remove("hidden");
+            setTimeout(() => document.getElementById("newLevelName").focus(), 50);
+        }
+
+        function closeAddLevelModal() {
+            document.getElementById("addLevelModal").classList.add("hidden");
+        }
+
+        function confirmAddLevel() {
+            const raw = document.getElementById("newLevelName").value.trim();
+            const name = raw || `Level ${levels.length + 1}`;
+            levels.push({ id: nextLevelId, name });
+            nextLevelId++;
+            saveLevels();
+            renderCatalog();
+            closeAddLevelModal();
+        }
+
+        let pendingRemoveId = null;
+
+        function removeLevel(id) {
+            if (curUser !== "inceptarc") return;
+            const lvl = levels.find(l => l.id === id);
+            if (!lvl) return;
+            pendingRemoveId = id;
+            document.getElementById("removeLevelText").textContent =
+                `Remove "${lvl.name}"? This only removes it from the catalog; its saved light pattern is not deleted.`;
+            document.getElementById("removeLevelModal").classList.remove("hidden");
+        }
+
+        function closeRemoveLevelModal() {
+            pendingRemoveId = null;
+            document.getElementById("removeLevelModal").classList.add("hidden");
+        }
+
+        function confirmRemoveLevel() {
+            if (pendingRemoveId === null) return;
+            levels = levels.filter(l => l.id !== pendingRemoveId);
+            saveLevels();
+            renderCatalog();
+            closeRemoveLevelModal();
+        }
+
+        function login() {
+            let u = document.getElementById("user").value.trim(), p = document.getElementById("pass").value;
+            let passMap = {"inceptarc":"incept@7", "user1":"incept@73", "user2":"incept@73", "user3":"incept@73"};
+            if (passMap[u] && passMap[u] === p) {
+                curUser = u; document.getElementById("tag").innerText = `CLIMB MONKEY (${u})`; show('p2', 'p1');
+                loadLevels();
+                renderCatalog();
+            } else { document.getElementById("err").innerText = "⚠️ Invalid User ID or Password!"; }
+        }
+
+        function logout() { show('p1', 'p2'); document.getElementById("user").value=""; document.getElementById("pass").value=""; document.getElementById("err").innerText=""; }
+
+        function openLvl(id) {
+            const lvl = levels.find(l => l.id === id);
+            if (!lvl) return;
+            curLevelId = id;
+            show('p3', 'p2');
+            document.getElementById("title").innerText = `Level: ${lvl.name}`;
+            document.getElementById("adminTools").className = (curUser === "inceptarc") ? "" : "hidden";
+            stopBlink();
+            draw();
+        }
+
+        let dragIdx = null;
+        let lights = {};
+        let undoStack = [];
+        let redoStack = [];
+        let currentCols = 35;
+        const STORAGE_KEY = "climbMonkeyLayout_v2";
+
+        const DEFAULT_ARR = [
+            null,59,null,60,null,109,null,110,null,159,null,160,null,209,null,210,null,259,null,260,null,309,null,310,null,359,null,360,null,409,null,410,null,459,null,
+            null,58,null,61,null,108,null,111,null,158,null,161,null,208,null,211,null,258,null,261,null,308,null,311,null,358,null,361,null,408,null,411,null,458,null,
+            null,57,null,62,null,107,null,112,null,157,null,162,null,207,null,212,null,257,null,262,null,307,null,312,null,357,null,362,null,407,null,412,null,457,null,
+            null,56,null,63,null,106,null,113,null,156,null,163,null,206,null,213,null,256,null,263,null,306,null,313,null,356,null,363,null,406,null,413,null,456,null,
+            null,null,64,null,null,null,114,null,null,null,164,null,null,null,214,null,null,null,264,null,null,null,314,null,null,null,364,null,null,null,414,null,null,null,null,
+            null,55,null,65,null,105,null,115,null,155,null,165,null,205,null,215,null,255,null,265,null,305,null,315,null,355,null,365,null,405,null,415,null,455,null,
+            54,null,null,null,104,null,null,null,154,null,null,null,204,null,null,null,254,null,null,null,304,null,null,null,354,null,null,null,404,null,null,null,454,null,null,
+            null,53,null,66,null,103,null,116,null,153,null,166,null,203,null,216,null,253,null,266,null,303,null,316,null,353,null,366,null,403,null,416,null,453,null,
+            null,null,67,null,null,null,117,null,null,null,167,null,null,null,217,null,null,null,267,null,null,null,317,null,null,null,367,null,null,null,417,null,null,null,null,
+            null,52,null,68,null,102,null,118,null,152,null,168,null,202,null,218,null,252,null,268,null,302,null,318,null,352,null,368,null,402,null,418,null,452,null,
+            51,null,null,null,101,null,null,null,151,null,null,null,201,null,null,null,251,null,null,null,301,null,null,null,351,null,null,null,401,null,null,null,451,null,null,
+            null,50,null,69,null,100,null,119,null,150,null,169,null,200,null,219,null,250,null,269,null,300,null,319,null,350,null,369,null,400,null,419,null,450,null,
+            null,null,70,null,null,null,120,null,null,null,170,null,null,null,220,null,null,null,270,null,null,null,320,null,null,null,370,null,null,null,420,null,null,null,null,
+            null,49,null,71,null,99,null,121,null,149,null,171,null,199,null,221,null,249,null,271,null,299,null,321,null,349,null,371,null,399,null,421,null,449,null,
+            48,null,null,null,98,null,null,null,148,null,null,null,198,null,null,null,248,null,null,null,298,null,null,null,348,null,null,null,398,null,null,null,448,null,null,
+            null,47,null,72,null,97,null,122,null,147,null,172,null,197,null,222,null,247,null,272,null,297,null,322,null,347,null,372,null,397,null,422,null,447,null,
+            null,null,73,null,null,null,123,null,null,null,173,null,null,null,223,null,null,null,273,null,null,null,323,null,null,null,373,null,null,null,423,null,null,null,null,
+            null,46,null,74,null,96,null,124,null,146,null,174,null,196,null,224,null,246,null,274,null,296,null,324,null,346,null,374,null,396,null,424,null,446,null,
+            45,null,null,null,95,null,null,null,145,null,null,null,195,null,null,null,245,null,null,null,295,null,null,null,345,null,null,null,395,null,null,null,445,null,null,
+            null,44,null,75,null,94,null,125,null,144,null,175,null,194,null,225,null,244,null,275,null,294,null,325,null,344,null,375,null,394,null,425,null,444,null,
+            null,null,76,null,null,null,126,null,null,null,176,null,null,null,226,null,null,null,276,null,null,null,326,null,null,null,376,null,null,null,426,null,null,null,null,
+            null,43,null,77,null,93,null,127,null,143,null,177,null,193,null,227,null,243,null,277,null,293,null,327,null,343,null,377,null,393,null,427,null,443,null,
+            42,null,null,null,92,null,null,null,142,null,null,null,192,null,null,null,242,null,null,null,292,null,null,null,342,null,null,null,392,null,null,null,442,null,null,
+            null,41,null,78,null,91,null,128,null,141,null,178,null,191,null,228,null,241,null,278,null,291,null,328,null,341,null,378,null,391,null,428,null,441,null,
+            null,null,79,null,null,null,129,null,null,null,179,null,null,null,229,null,null,null,279,null,null,null,329,null,null,null,379,null,null,null,429,null,null,null,null,
+            null,40,null,80,null,90,null,130,null,140,null,180,null,190,null,230,null,240,null,280,null,290,null,330,null,340,null,380,null,390,null,430,null,440,null,
+            39,null,null,null,89,null,null,null,139,null,null,null,189,null,null,null,239,null,null,null,289,null,null,null,339,null,null,null,389,null,null,null,439,null,null,
+            null,38,null,81,null,88,null,131,null,138,null,181,null,188,null,231,null,238,null,281,null,288,null,331,null,338,null,381,null,388,null,431,null,438,null,
+            null,null,82,null,null,null,132,null,null,null,182,null,null,null,232,null,null,null,282,null,null,null,332,null,null,null,382,null,null,null,432,null,null,null,null,
+            null,37,null,83,null,87,null,133,null,137,null,183,null,187,null,233,null,237,null,283,null,287,null,333,null,337,null,383,null,387,null,433,null,437,null,
+            36,null,null,null,86,null,null,null,136,null,null,null,186,null,null,null,236,null,null,null,286,null,null,null,336,null,null,null,386,null,null,null,436,null,null,
+            null,35,null,84,null,85,null,134,null,135,null,184,null,185,null,234,null,235,null,284,null,285,null,334,null,335,null,384,null,385,null,434,null,435,null,
+            null,18,null,19,null,20,null,21,null,22,null,23,null,24,null,25,null,26,null,27,null,28,null,29,null,30,null,31,null,32,null,33,null,34,null,
+            null,17,null,16,null,15,null,14,null,13,null,12,null,11,null,10,null,9,null,8,null,7,null,6,null,5,null,4,null,3,null,2,null,1,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
+        ];
+
+        let arr = [...DEFAULT_ARR];
+
+        function loadFromStorage(silent) {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    arr = data.arr;
+                    lights = data.lights || {};
+                    currentCols = data.cols || 35;
+                    if (!silent) showStatus("Layout loaded ✔");
+                    return true;
+                } catch (e) { console.error("Failed to load saved layout", e); }
+            }
+            return false;
+        }
+
+        function showStatus(msg) {
+            const el = document.getElementById("statusMsg");
+            el.textContent = msg;
+            setTimeout(() => { el.textContent = ""; }, 2500);
+        }
+
+        function saveState() {
+            undoStack.push({ gridArr: [...arr], lightStates: JSON.stringify(lights), cols: currentCols });
+            redoStack = [];
+            updateButtons();
+        }
+
+        function updateButtons() {
+            document.getElementById("undoBtn").style.opacity = undoStack.length === 0 ? "0.5" : "1";
+            document.getElementById("redoBtn").style.opacity = redoStack.length === 0 ? "0.5" : "1";
+        }
+
+        function saveToStorage() {
+            const data = { arr: arr, lights: lights, cols: currentCols };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            showStatus("Saved to browser ✔");
+        }
+
+        function resetToDefault() {
+            showGenericConfirm(
+                "Reset to the original default layout? This clears your custom arrangement.",
+                () => {
+                    saveState();
+                    arr = [...DEFAULT_ARR];
+                    lights = {};
+                    currentCols = 35;
+                    draw();
+                    showStatus("Reset to original ✔");
+                }
+            );
+        }
+
+        // -------- Generic in-page confirm (replaces native confirm() which some sandboxed views block) --------
+        let genericConfirmAction = null;
+
+        function showGenericConfirm(message, onConfirm) {
+            genericConfirmAction = onConfirm;
+            document.getElementById("genericConfirmText").textContent = message;
+            document.getElementById("genericConfirmModal").classList.remove("hidden");
+        }
+
+        function closeGenericConfirm() {
+            genericConfirmAction = null;
+            document.getElementById("genericConfirmModal").classList.add("hidden");
+        }
+
+        function runGenericConfirm() {
+            const action = genericConfirmAction;
+            closeGenericConfirm();
+            if (action) action();
+        }
+
+        function draw() {
+            const wall = document.getElementById("matrix");
+            wall.style.gridTemplateColumns = `repeat(${currentCols}, minmax(45px, 1fr))`;
+
+            const canEdit = (curUser === "inceptarc");
+            const parts = new Array(arr.length);
+
+            arr.forEach((id, idx) => {
+                let inner = canEdit
+                    ? `<div class="action-btns"><span onclick="insertRowInBetween(${idx})">+R</span><span onclick="insertColInBetween(${idx})">+C</span></div>`
+                    : "";
+
+                if (id !== null && id !== "") {
+                    const st = lights[id] || { r: false, g: false, b: false };
+                    const clickR = canEdit ? `onclick="clickSeg(${id}, 'r')"` : "";
+                    const clickG = canEdit ? `onclick="clickSeg(${id}, 'g')"` : "";
+                    const clickB = canEdit ? `onclick="clickSeg(${id}, 'b')"` : "";
+                    const clickableClass = canEdit ? "clickable" : "";
+                    inner += `
+                        <div style="margin-top:12px;">#${id}</div>
+                        <svg class="rock" viewBox="0 0 100 100" data-hold="${id}">
+                            <path class="seg r ${clickableClass} ${st.r ? 'on' : ''}" data-seg="r" ${clickR} d="M50,50 L50,5 A45,45 0 0,0 11,72 Z"/>
+                            <path class="seg b ${clickableClass} ${st.b ? 'on' : ''}" data-seg="b" ${clickB} d="M50,50 L11,72 A45,45 0 0,0 89,72 Z"/>
+                            <path class="seg g ${clickableClass} ${st.g ? 'on' : ''}" data-seg="g" ${clickG} d="M50,50 L89,72 A45,45 0 0,0 50,5 Z"/>
+                        </svg>`;
+                } else {
+                    inner += `<div class="empty">-</div>`;
+                }
+
+                const dragAttrs = canEdit
+                    ? `draggable="true" ondragstart="ds(${idx})" ondragover="dov(event)" ondrop="dp(${idx})"`
+                    : "";
+                parts[idx] = `<div class="box" ${dragAttrs}>${inner}</div>`;
+            });
+
+            wall.innerHTML = parts.join("");
+            updateButtons();
+        }
+
+        function clickSeg(id, seg) {
+            if (curUser !== "inceptarc") return;
+            saveState();
+            if (!lights[id]) lights[id] = { r: false, g: false, b: false };
+            lights[id][seg] = !lights[id][seg];
+            const svg = document.querySelector(`svg[data-hold="${id}"]`);
+            if (svg) {
+                const path = svg.querySelector(`path[data-seg="${seg}"]`);
+                if (path) path.classList.toggle('on', !!lights[id][seg]);
+            } else {
+                draw();
+            }
+        }
+
+        function allOff() {
+            stopBlink();
+            lights = {};
+            draw();
+        }
+
+        function insertRowInBetween(idx) {
+            saveState();
+            let rowEndIndex = idx - (idx % currentCols) + currentCols;
+            for(let i = 0; i < currentCols; i++) { arr.splice(rowEndIndex, 0, null); }
+            draw();
+        }
+
+        function insertColInBetween(idx) {
+            saveState();
+            let targetCol = idx % currentCols;
+            let totalRows = arr.length / currentCols;
+            for (let r = totalRows - 1; r >= 0; r--) {
+                let insertPos = (r * currentCols) + targetCol + 1;
+                arr.splice(insertPos, 0, null);
+            }
+            currentCols++;
+            draw();
+        }
+
+        function ds(i) { dragIdx = i; }
+        function dov(e) { e.preventDefault(); }
+        function dp(i) {
+            if (dragIdx === null || dragIdx === i) return;
+            saveState();
+            let tmp = arr[dragIdx]; arr[dragIdx] = arr[i]; arr[i] = tmp;
+            draw();
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            redoStack.push({ gridArr: [...arr], lightStates: JSON.stringify(lights), cols: currentCols });
+            let prev = undoStack.pop();
+            arr = prev.gridArr; lights = JSON.parse(prev.lightStates); currentCols = prev.cols;
+            draw();
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            undoStack.push({ gridArr: [...arr], lightStates: JSON.stringify(lights), cols: currentCols });
+            let next = redoStack.pop();
+            arr = next.gridArr; lights = JSON.parse(next.lightStates); currentCols = next.cols;
+            draw();
+        }
+
+        let blinkTimer = null;
+        let blinkOn = true;
+
+        function startBlink() {
+            if (blinkTimer) return;
+            blinkTimer = setInterval(() => {
+                blinkOn = !blinkOn;
+                document.querySelectorAll('.seg.on').forEach(el => { el.style.opacity = blinkOn ? '1' : '0.12'; });
+            }, 450);
+        }
+
+        function stopBlink() {
+            if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = null; }
+            blinkOn = true;
+            document.querySelectorAll('.seg').forEach(el => { el.style.opacity = '1'; });
+        }
+
+        // -------- Export current arrangement as ready-to-paste code --------
+        function showCodeExport() {
+            if (curUser !== "inceptarc") return;
+            const cols = currentCols;
+            let lines = [];
+            for (let i = 0; i < arr.length; i += cols) {
+                const rowVals = arr.slice(i, i + cols).map(v => v === null ? "null" : v);
+                lines.push("            " + rowVals.join(","));
+            }
+            const arrText = lines.join(",\n");
+
+            const code =
+`const DEFAULT_ARR = [
+${arrText}
+];
+
+// currentCols should be set to: ${cols}
+let currentCols = ${cols};`;
+
+            document.getElementById("codeOutput").value = code;
+            document.getElementById("codeModal").classList.remove("hidden");
+        }
+
+        function closeCodeExport() {
+            document.getElementById("codeModal").classList.add("hidden");
+        }
+
+        function copyCodeExport() {
+            const ta = document.getElementById("codeOutput");
+            ta.select();
+            ta.setSelectionRange(0, 999999);
+            try { document.execCommand("copy"); } catch (e) {}
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(ta.value).catch(() => {});
+            }
+            const st = document.getElementById("copyStatus");
+            st.textContent = "Copied ✔";
+            setTimeout(() => { st.textContent = ""; }, 2000);
+        }
+
+        // ============================================================
+        // TACTILE FEEDBACK — ripple + subtle vibration on every tap
+        // ============================================================
+        function fireRipple(el, evt) {
+            const rect = el.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height) * 1.4;
+            const ripple = document.createElement("span");
+            ripple.className = "ripple";
+            ripple.style.width = ripple.style.height = size + "px";
+            const x = (evt.clientX ?? rect.left + rect.width / 2) - rect.left - size / 2;
+            const y = (evt.clientY ?? rect.top + rect.height / 2) - rect.top - size / 2;
+            ripple.style.left = x + "px";
+            ripple.style.top = y + "px";
+            const posStyle = getComputedStyle(el).position;
+            if (posStyle === "static") el.style.position = "relative";
+            el.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        }
+
+        function fireVibrate() {
+            if (navigator.vibrate) {
+                try { navigator.vibrate(12); } catch (e) {}
+            }
+        }
+
+        document.addEventListener("click", (evt) => {
+            const target = evt.target.closest("button, .card, .action-btns span, .seg.clickable");
+            if (!target) return;
+            fireVibrate();
+            fireRipple(target, evt);
+            if (target.tagName === "BUTTON") {
+                target.classList.remove("pressed");
+                void target.offsetWidth; // restart animation
+                target.classList.add("pressed");
+            }
+        }, true);
+
+        loadFromStorage(true);
+    </script>
+</body>
+</html>
