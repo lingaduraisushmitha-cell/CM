@@ -509,60 +509,43 @@
             }
         }
 
+                // ============================================================
+        // RASPBERRY PI ZERO 2 W - 8x8 LED CONTROL CODE
+        // ============================================================
+        const PI_IP = "http://192.168.0.42:5000"; 
+
+        function triggerLedOn() {
+            fetch(`${PI_IP}/led`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'ON' })
+            })
+            .then(res => res.json())
+            .then(data => console.log("Pi Server Matrix ON:", data))
+            .catch(err => console.error("Pi server connect aagala:", err));
+        }
+
+        function triggerLedOff() {
+            fetch(`${PI_IP}/led`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'OFF' })
+            })
+            .then(res => res.json())
+            .then(data => console.log("Pi Server Matrix OFF:", data))
+            .catch(err => console.error("Pi server connect aagala:", err));
+        }
+
+        // Modifying your existing UI functions to talk to your Raspberry Pi
         function allOff() {
             stopBlink();
             lights = {};
             draw();
+            triggerLedOff(); // Webpage UI-la clear/allOff aagumpodhu LED Matrix-ah off pannum
         }
-
-        function insertRowInBetween(idx) {
-            saveState();
-            let rowEndIndex = idx - (idx % currentCols) + currentCols;
-            for(let i = 0; i < currentCols; i++) { arr.splice(rowEndIndex, 0, null); }
-            draw();
-        }
-
-        function insertColInBetween(idx) {
-            saveState();
-            let targetCol = idx % currentCols;
-            let totalRows = arr.length / currentCols;
-            for (let r = totalRows - 1; r >= 0; r--) {
-                let insertPos = (r * currentCols) + targetCol + 1;
-                arr.splice(insertPos, 0, null);
-            }
-            currentCols++;
-            draw();
-        }
-
-        function ds(i) { dragIdx = i; }
-        function dov(e) { e.preventDefault(); }
-        function dp(i) {
-            if (dragIdx === null || dragIdx === i) return;
-            saveState();
-            let tmp = arr[dragIdx]; arr[dragIdx] = arr[i]; arr[i] = tmp;
-            draw();
-        }
-
-        function undo() {
-            if (undoStack.length === 0) return;
-            redoStack.push({ gridArr: [...arr], lightStates: JSON.stringify(lights), cols: currentCols });
-            let prev = undoStack.pop();
-            arr = prev.gridArr; lights = JSON.parse(prev.lightStates); currentCols = prev.cols;
-            draw();
-        }
-
-        function redo() {
-            if (redoStack.length === 0) return;
-            undoStack.push({ gridArr: [...arr], lightStates: JSON.stringify(lights), cols: currentCols });
-            let next = redoStack.pop();
-            arr = next.gridArr; lights = JSON.parse(next.lightStates); currentCols = next.cols;
-            draw();
-        }
-
-        let blinkTimer = null;
-        let blinkOn = true;
 
         function startBlink() {
+            triggerLedOn(); // Webpage-la blink alladhu start trigger aagumpodhu LED-ah ON pannum
             if (blinkTimer) return;
             blinkTimer = setInterval(() => {
                 blinkOn = !blinkOn;
@@ -571,6 +554,7 @@
         }
 
         function stopBlink() {
+            triggerLedOff(); // Webpage-la blink/stop trigger aagumpodhu LED-ah OFF pannum
             if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = null; }
             blinkOn = true;
             document.querySelectorAll('.seg').forEach(el => { el.style.opacity = '1'; });
