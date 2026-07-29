@@ -495,25 +495,6 @@
             updateButtons();
         }
 
-               // ============================================================
-        // CLIMB MONKEY DYNAMIC GRID COORDINATE SYNC LOGIC
-        // ============================================================
-        const PI_IP = "http://192.168.0.42:5000"; 
-
-        // Indha function automatic-ah unga screen layout hold changes data-vai Pi-ku sync pannum
-        function syncGridToRaspberryPi() {
-            fetch(`${PI_IP}/sync_grid`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    grid: arr,          // Web page-il ulla current arrangement layout array data
-                    lights: lights,    // Active climbing hold patterns parameters list
-                    cols: currentCols  // Total dynamic board columns structure count
-                })
-            })
-            .catch(err => console.error("Pi synchronization error:", err));
-        }
-
         function clickSeg(id, seg) {
             if (curUser !== "inceptarc") return;
             saveState();
@@ -526,21 +507,13 @@
             } else {
                 draw();
             }
-            
-            // Custom touch segment trigger anuppugiradhu
-            syncGridToRaspberryPi();
         }
 
         function allOff() {
             stopBlink();
             lights = {};
             draw();
-            
-            // Clear request to Raspberry Pi
-            fetch(`${PI_IP}/clear`, { method: 'POST' })
-            .catch(err => console.error(err));
         }
-
 
         function insertRowInBetween(idx) {
             saveState();
