@@ -495,6 +495,35 @@
             updateButtons();
         }
 
+               // ============================================================
+        // CLIMB MONKEY CENTRAL DYNAMIC SYNC ARCHITECTURE
+        // ============================================================
+        const PI_IP = "http://pizero2w4.local:5000"; 
+
+        function sendClimbLayoutToPi() {
+            let activeHolds = {};
+            Object.keys(lights).forEach(id => {
+                if (lights[id] && (lights[id].r || lights[id].g || lights[id].b)) {
+                    activeHolds[id] = {
+                        r: !!lights[id].r,
+                        g: !!lights[id].g,
+                        b: !!lights[id].b
+                    };
+                }
+            });
+
+            // Packing the total active grids data context parameters directly to Pi endpoint
+            fetch(`${PI_IP}/sync_grid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    lights: activeHolds,
+                    cols: currentCols 
+                })
+            })
+            .catch(err => console.error("Pi server sync blocked:", err));
+        }
+
         function clickSeg(id, seg) {
             if (curUser !== "inceptarc") return;
             saveState();
@@ -507,13 +536,20 @@
             } else {
                 draw();
             }
+            
+            // Auto dispatch trigger on every hold screen touch interaction
+            sendClimbLayoutToPi();
         }
 
         function allOff() {
             stopBlink();
             lights = {};
             draw();
+            
+            // Universal reset request call to physical matrix strip nodes
+            fetch(`${PI_IP}/clear`, { method: 'POST' }).catch(err => console.error(err));
         }
+
 
         function insertRowInBetween(idx) {
             saveState();
