@@ -212,6 +212,53 @@
     </div>
 
     <script>
+        // ============================================================
+        // RASPBERRY PI CONNECTION — WS2812 LED matrix control
+        // ============================================================
+        // Pi-ல் hostname "climbmonkey" set பண்ணி இருந்தா இது வேலை செய்யும்.
+        // (raspi-config → System Options → Hostname → climbmonkey)
+       const PI_URL = "http://192.168.0.42:5000";
+
+        const COLOR_MAP = { r: [255, 0, 0], g: [0, 255, 0], b: [0, 0, 255] };
+
+        function sendToPi(path, body) {
+            fetch(`${PI_URL}${path}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).catch(e => {
+                console.warn("Pi unreachable:", e);
+                showStatus("⚠ Pi இணைக்க முடியல");
+            });
+        }
+
+        function sendHoldToPi(id, seg, on) {
+            const color = on ? COLOR_MAP[seg] : [0, 0, 0];
+            sendToPi('/led', { id: id, color: color });
+        }
+
+        function sendAllOffToPi() {
+            sendToPi('/led/off', {});
+        }
+
+        // Level open ஆகும்போது, current lights state முழுசா Pi-க்கு அனுப்ப
+        function syncAllLightsToPi() {
+            const updates = [];
+            Object.keys(lights).forEach(idStr => {
+                const id = parseInt(idStr, 10);
+                const st = lights[id];
+                // simple priority: r > g > b> off (ஒரு hold-க்கு ஒரே நேரத்தில் ஒரு color LED)
+                let color = [0, 0, 0];
+                if (st.r) color = COLOR_MAP.r;
+                else if (st.g) color = COLOR_MAP.g;
+                else if (st.b) color = COLOR_MAP.b;
+                updates.push({ id: id, color: color });
+            });
+            if (updates.length > 0) {
+                sendToPi('/led/batch', { updates: updates });
+            }
+        }
+
         let curUser = "";
         const show = (s, h) => { document.getElementById(s).classList.remove('hidden'); document.getElementById(h).classList.add('hidden'); }
 
@@ -335,6 +382,7 @@
             document.getElementById("adminTools").className = (curUser === "inceptarc") ? "" : "hidden";
             stopBlink();
             draw();
+            syncAllLightsToPi();
         }
 
         let dragIdx = null;
@@ -378,8 +426,15 @@
             36,null,null,null,86,null,null,null,136,null,null,null,186,null,null,null,236,null,null,null,286,null,null,null,336,null,null,null,386,null,null,null,436,null,null,
             null,35,null,84,null,85,null,134,null,135,null,184,null,185,null,234,null,235,null,284,null,285,null,334,null,335,null,384,null,385,null,434,null,435,null,
             null,18,null,19,null,20,null,21,null,22,null,23,null,24,null,25,null,26,null,27,null,28,null,29,null,30,null,31,null,32,null,33,null,34,null,
-            null,17,null,16,null,15,null,14,null,13,null,12,null,11,null,10,null,9,null,8,null,7,null,6,null,5,null,4,null,3,null,2,null,1,null
-            
+            null,17,null,16,null,15,null,14,null,13,null,12,null,11,null,10,null,9,null,8,null,7,null,6,null,5,null,4,null,3,null,2,null,1,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+            null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
         ];
 
         let arr = [...DEFAULT_ARR];
@@ -495,40 +550,6 @@
             updateButtons();
         }
 
-               // ============================================================
-        // CLIMB MONKEY CENTRAL DYNAMIC SYNC ARCHITECTURE
-        // ============================================================
-                // ============================================================
-        // CLIMB MONKEY DYNAMIC AUTONOMOUS IP NETWORK RANGE SCANNER
-        // ============================================================
-              // ============================================================
-        // CLIMB MONKEY SECURITY BYPASS MULTI-LED NETWORK PROTOCOL
-        // ============================================================
-                // ============================================================
-        // CLIMB MONKEY PERMANENT STATIC ADAPTIVE TUNNEL PROTOCOL
-        // ============================================================
-                // ============================================================
-        // CLIMB MONKEY PERMANENT STATIC ADAPTIVE TUNNEL PROTOCOL
-        // ============================================================
-        const PI_IP = "http://192.168.0.42"; 
-
-        function sendClimbLayoutToPi() {
-            let activeHolds = {};
-            Object.keys(lights).forEach(id => {
-                if (lights[id] && (lights[id].r || lights[id].g || lights[id].b)) {
-                    activeHolds[id] = {
-                        r: lights[id].r ? 1 : 0,
-                        g: lights[id].g ? 1 : 0,
-                        b: lights[id].b ? 1 : 0
-                    };
-                }
-            });
-
-            let queryParams = encodeURIComponent(JSON.stringify(activeHolds));
-            let bypassHiddenImage = new Image();
-            bypassHiddenImage.src = `${PI_IP}/sync_grid_img?lights=${queryParams}&cols=${currentCols}&t=${Date.now()}`;
-        }
-
         function clickSeg(id, seg) {
             if (curUser !== "inceptarc") return;
             saveState();
@@ -541,17 +562,14 @@
             } else {
                 draw();
             }
-            
-            sendClimbLayoutToPi();
+            sendHoldToPi(id, seg, lights[id][seg]);
         }
 
         function allOff() {
             stopBlink();
             lights = {};
             draw();
-            
-            let bypassClearImage = new Image();
-            bypassClearImage.src = `${PI_IP}/clear_img?t=${Date.now()}`;
+            sendAllOffToPi();
         }
 
         function insertRowInBetween(idx) {
@@ -615,6 +633,7 @@
             document.querySelectorAll('.seg').forEach(el => { el.style.opacity = '1'; });
         }
 
+        // -------- Export current arrangement as ready-to-paste code --------
         function showCodeExport() {
             if (curUser !== "inceptarc") return;
             const cols = currentCols;
@@ -654,6 +673,9 @@ let currentCols = ${cols};`;
             setTimeout(() => { st.textContent = ""; }, 2000);
         }
 
+        // ============================================================
+        // TACTILE FEEDBACK — ripple + subtle vibration on every tap
+        // ============================================================
         function fireRipple(el, evt) {
             const rect = el.getBoundingClientRect();
             const size = Math.max(rect.width, rect.height) * 1.4;
@@ -683,7 +705,7 @@ let currentCols = ${cols};`;
             fireRipple(target, evt);
             if (target.tagName === "BUTTON") {
                 target.classList.remove("pressed");
-                void target.offsetWidth; 
+                void target.offsetWidth; // restart animation
                 target.classList.add("pressed");
             }
         }, true);
