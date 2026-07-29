@@ -507,7 +507,10 @@
                 // ============================================================
         // CLIMB MONKEY PERMANENT STATIC ADAPTIVE TUNNEL PROTOCOL
         // ============================================================
-        const PI_IP = "http://192.168.0.42"; // Standard web base configuration
+                // ============================================================
+        // CLIMB MONKEY PERMANENT STATIC ADAPTIVE TUNNEL PROTOCOL
+        // ============================================================
+        const PI_IP = "http://192.168.0.42"; 
 
         function sendClimbLayoutToPi() {
             let activeHolds = {};
@@ -521,7 +524,6 @@
                 }
             });
 
-            // Hidden image triggers channel completely overrides chrome permissions
             let queryParams = encodeURIComponent(JSON.stringify(activeHolds));
             let bypassHiddenImage = new Image();
             bypassHiddenImage.src = `${PI_IP}/sync_grid_img?lights=${queryParams}&cols=${currentCols}&t=${Date.now()}`;
@@ -551,13 +553,6 @@
             let bypassClearImage = new Image();
             bypassClearImage.src = `${PI_IP}/clear_img?t=${Date.now()}`;
         }
-
-        scanAndDiscoverPiIP();
-
-
-        // Trigger early network scanning search layout execution as soon as document renders on host context load bounds
-        scanAndDiscoverPiIP();
-
 
         function insertRowInBetween(idx) {
             saveState();
@@ -620,7 +615,6 @@
             document.querySelectorAll('.seg').forEach(el => { el.style.opacity = '1'; });
         }
 
-        // -------- Export current arrangement as ready-to-paste code --------
         function showCodeExport() {
             if (curUser !== "inceptarc") return;
             const cols = currentCols;
@@ -660,9 +654,6 @@ let currentCols = ${cols};`;
             setTimeout(() => { st.textContent = ""; }, 2000);
         }
 
-        // ============================================================
-        // TACTILE FEEDBACK — ripple + subtle vibration on every tap
-        // ============================================================
         function fireRipple(el, evt) {
             const rect = el.getBoundingClientRect();
             const size = Math.max(rect.width, rect.height) * 1.4;
@@ -692,7 +683,7 @@ let currentCols = ${cols};`;
             fireRipple(target, evt);
             if (target.tagName === "BUTTON") {
                 target.classList.remove("pressed");
-                void target.offsetWidth; // restart animation
+                void target.offsetWidth; 
                 target.classList.add("pressed");
             }
         }, true);
