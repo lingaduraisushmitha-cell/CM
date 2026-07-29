@@ -498,9 +498,58 @@
                // ============================================================
         // CLIMB MONKEY CENTRAL DYNAMIC SYNC ARCHITECTURE
         // ============================================================
-        const PI_IP = "http://pizero2w4.local:5000"; 
+                // ============================================================
+        // CLIMB MONKEY DYNAMIC AUTONOMOUS IP NETWORK RANGE SCANNER
+        // ============================================================
+        let DETECTED_PI_IP = null; // Background active lock parameter
+        let isScanningNetwork = false;
 
-        function sendClimbLayoutToPi() {
+        async function scanAndDiscoverPiIP() {
+            if (DETECTED_PI_IP || isScanningNetwork) return DETECTED_PI_IP;
+            isScanningNetwork = true;
+            console.log("Starting autonomous local network discovery for Raspberry Pi Zero 2 W...");
+            
+            // Standard domestic local network router ip subnet scope arrays loops lines
+            const baseSubnets = ["192.168.0", "192.168.1", "192.168.137"];
+            let scanPromises = [];
+
+            for (let base of baseSubnets) {
+                // Proportional execution sweeps across potential active internal router hosts indices
+                for (let i = 2; i <= 254; i++) {
+                    let targetTestIP = `http://${base}.${i}:5000`;
+                    
+                    let p = fetch(`${targetTestIP}/clear`, { 
+                        method: 'POST',
+                        signal: AbortSignal.timeout(300) // Fast ping validation context perimeter threshold
+                    })
+                    .then(res => {
+                        if (res.ok) {
+                            DETECTED_PI_IP = targetTestIP;
+                            console.log("⚡ Raspberry Pi Target Base Successfully Discovered at IP Range Host Node:", targetTestIP);
+                        }
+                    })
+                    .catch(() => {});
+                    
+                    scanPromises.push(p);
+                }
+            }
+
+            await Promise.all(scanPromises);
+            isScanningNetwork = false;
+            return DETECTED_PI_IP;
+        }
+
+        async function sendClimbLayoutToPi() {
+            // First time dynamic network discover module route check initialization handler trigger
+            let piBaseURL = DETECTED_PI_IP;
+            if (!piBaseURL) {
+                piBaseURL = await scanAndDiscoverPiIP();
+            }
+            if (!piBaseURL) {
+                // Secondary fail-safe dynamic hostname link execution routing lookup bounds
+                piBaseURL = "http://pizero2w4.local:5000";
+            }
+
             let activeHolds = {};
             Object.keys(lights).forEach(id => {
                 if (lights[id] && (lights[id].r || lights[id].g || lights[id].b)) {
@@ -512,8 +561,8 @@
                 }
             });
 
-            // Packing the total active grids data context parameters directly to Pi endpoint
-            fetch(`${PI_IP}/sync_grid`, {
+            // Dispatching configuration map variables payload directly to scanned target active path endpoint
+            fetch(`${piBaseURL}/sync_grid`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -521,7 +570,7 @@
                     cols: currentCols 
                 })
             })
-            .catch(err => console.error("Pi server sync blocked:", err));
+            .catch(err => console.error("Pi server transaction sync blocked:", err));
         }
 
         function clickSeg(id, seg) {
@@ -537,18 +586,20 @@
                 draw();
             }
             
-            // Auto dispatch trigger on every hold screen touch interaction
             sendClimbLayoutToPi();
         }
 
-        function allOff() {
+        async function allOff() {
             stopBlink();
             lights = {};
             draw();
             
-            // Universal reset request call to physical matrix strip nodes
-            fetch(`${PI_IP}/clear`, { method: 'POST' }).catch(err => console.error(err));
+            let piBaseURL = DETECTED_PI_IP || "http://pizero2w4.local:5000";
+            fetch(`${piBaseURL}/clear`, { method: 'POST' }).catch(err => console.error(err));
         }
+
+        // Trigger early network scanning search layout execution as soon as document renders on host context load bounds
+        scanAndDiscoverPiIP();
 
 
         function insertRowInBetween(idx) {
